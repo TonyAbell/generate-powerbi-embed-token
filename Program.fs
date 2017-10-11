@@ -69,17 +69,31 @@ let main argv =
     use powerBIPostStream = powerBIRequest.GetRequestStream()
     powerBIPostStream.Write(powerBIRequestBody,0,powerBIRequestBody.Length)
 
-    use powerBIResponse = powerBIRequest.GetResponse()
-
-    let powerBIResponseObj = 
-        (new StreamReader( powerBIResponse.GetResponseStream())).ReadToEnd() 
-        |> JObject.Parse
+    try 
+        use powerBIResponse = powerBIRequest.GetResponse()
+        let powerBIResponseObj = 
+            (new StreamReader( powerBIResponse.GetResponseStream())).ReadToEnd() 
+            |> JObject.Parse
     
    
-    let embedToken = powerBIResponseObj.GetValue("token").ToString()
-    let embedUrl = sprintf "https://app.powerbi.com/reportEmbed?reportId=%s&groupId=%s" reportId groupId
+        let embedToken = powerBIResponseObj.GetValue("token").ToString()
+        let embedUrl = sprintf "https://app.powerbi.com/reportEmbed?reportId=%s&groupId=%s" reportId groupId
 
-    printfn "Embed Token:\n\t%s\n" embedToken
-    printfn "Embed URL:\n\t%s\n" embedUrl
-    printfn "Report Id:\n\t%s\n" reportId
+        printfn "Embed Token:\n\t%s\n" embedToken
+        printfn "Embed URL:\n\t%s\n" embedUrl
+        printfn "Report Id:\n\t%s\n" reportId
+    with 
+        | :? WebException as ex -> 
+            printfn "\nError Getting Power BI Embed Token\n"
+            use stream = ex.Response.GetResponseStream()
+            use reader = new StreamReader(stream)
+            printfn "HTTP Status Code: \n\n\t%s" ((ex.Response :?> HttpWebResponse).StatusCode.ToString())
+            //printfn "%s" ""
+            let errorMsg = (reader.ReadToEnd())
+            if not (String.IsNullOrEmpty(errorMsg)) then
+                printfn "Error Body: \n\n%s" (JObject.Parse(errorMsg).ToString(Formatting.Indented))
+                ()
+        | ex -> printfn "\nException\n\t%A" ex
+        
+    
     0 
